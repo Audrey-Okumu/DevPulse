@@ -7,6 +7,7 @@ from django.conf import settings
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from .tasks import review_pr_task
 
 from .models import Installation, ReviewedPR
 
@@ -75,7 +76,7 @@ def github_webhook(request):
         logger.info("Skipping duplicate: %s", reviewed_pr)
         return JsonResponse({"status": "skipped", "reason": "already processed"})
 
-    # Step 5 will replace this with: review_pr_task.delay(reviewed_pr.id)
-    logger.info("Queued for review (Celery task not wired yet): %s", reviewed_pr)
+    review_pr_task.delay(reviewed_pr.id)
+    logger.info("Queued Celery task for: %s", reviewed_pr)
 
     return JsonResponse({"status": "queued", "pr": f"{repo_full_name}#{pr_number}"})
