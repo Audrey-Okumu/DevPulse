@@ -12,7 +12,7 @@ INSTALLATION_ID = "162424050"
 
 OWNER = "Audrey-Okumu"
 REPO = "DevPulse"
-PR_NUMBER = 1  # your test PR
+PR_NUMBER = 1 
 
 def get_pr_files(installation_token):
     url = f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/files"
@@ -22,6 +22,17 @@ def get_pr_files(installation_token):
         "X-GitHub-Api-Version": "2022-11-28",
     }
     response = requests.get(url, headers=headers, params={"per_page": 100})
+    response.raise_for_status()
+    return response.json()
+
+def post_comment(installation_token, body):
+    url = f"https://api.github.com/repos/{OWNER}/{REPO}/issues/{PR_NUMBER}/comments"
+    headers = {
+        "Authorization": f"Bearer {installation_token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    response = requests.post(url, headers=headers, json={"body": body})
     response.raise_for_status()
     return response.json()
 
@@ -84,6 +95,8 @@ if __name__ == "__main__":
     files = get_pr_files(installation_token)
     print(f"Found {len(files)} changed file(s):\n")
 
+    review_sections = []
+
     for f in files:
         if not f["filename"].endswith(".py"):
             print(f"Skipping {f['filename']} (not a Python file)")
@@ -97,3 +110,11 @@ if __name__ == "__main__":
         print(f"Reviewing: {f['filename']}")
         review = get_ai_review(f["filename"], f["patch"])
         print(review)
+        review_sections.append(f"### `{f['filename']}`\n\n{review}")
+
+    if review_sections:
+        comment_body = "## 🤖 AI Code Review\n\n" + "\n\n---\n\n".join(review_sections)
+        result = post_comment(installation_token, comment_body)
+        print(f"\nComment posted: {result['html_url']}")
+    else:
+        print("\nNo Python files to review — no comment posted.")
