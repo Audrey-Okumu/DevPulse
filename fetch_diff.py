@@ -4,6 +4,7 @@ import jwt  # from PyJWT
 import os
 load_dotenv()
 import requests
+from google import genai
 
 APP_ID = os.environ.get("GITHUB_APP_ID", "")
 PRIVATE_KEY_PATH = "keys/devpulse-private-key.pem"
@@ -49,6 +50,30 @@ def get_installation_token(jwt_token):
     response.raise_for_status()
     return response.json()["token"]
 
+
+def get_ai_review(filename, patch):
+    client = genai.Client(api_key=os.environ.get("LLM_API_KEY"))
+
+    prompt = f"""You are a senior Python code reviewer. Review the following diff from the file `{filename}`.
+
+Focus on:
+- Bugs or correctness issues
+- Style issues (PEP 8, naming, readability)
+- Risks (security, performance, edge cases)
+
+Be concise. If there's nothing significant to flag, say so briefly rather than inventing issues.
+
+Diff:
+{patch}
+"""
+
+    response = client.models.generate_content(
+        model="gemini-3.6-flash",
+        contents=prompt,
+    )
+
+    return response.text
+
 if __name__ == "__main__":
     jwt_token = generate_jwt()
     print("JWT generated.")
@@ -60,10 +85,15 @@ if __name__ == "__main__":
     print(f"Found {len(files)} changed file(s):\n")
 
     for f in files:
+        if not f["filename"].endswith(".py"):
+            print(f"Skipping {f['filename']} (not a Python file)")
+            continue
+
+        if "patch" not in f:
+            print(f"Skipping {f['filename']} (no patch available)")
+            continue
+
         print("=" * 60)
-        print(f"File: {f['filename']}")
-        print(f"Status: {f['status']} (+{f['additions']} -{f['deletions']})")
-        if "patch" in f:
-            print(f['patch'][:500])
-        else:
-            print("(no patch available — binary or too large)")
+        print(f"Reviewing: {f['filename']}")
+        review = get_ai_review(f["filename"], f["patch"])
+        print(review)
