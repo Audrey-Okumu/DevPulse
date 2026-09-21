@@ -7,4 +7,7 @@ def calculate_total(items):
 def divide(a, b):
     return a / b
 
+def is_even(n):
+    return n % 2 = 0
+
 API_KEY = "sk-12345-hardcoded-secret"
